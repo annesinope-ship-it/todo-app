@@ -560,8 +560,8 @@ let colorPickerOpen=null;
 // ── SYNC ──
 let syncTimeout=null;
 function save(){
+  state.lastSaved=Date.now();
   localStorage.setItem('todo5',JSON.stringify(state));
-  // Debounce KV sync — attendre 1.5s après la dernière modif
   clearTimeout(syncTimeout);
   syncTimeout=setTimeout(syncToKV, 1500);
 }
@@ -573,9 +573,7 @@ async function syncToKV(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({todo5:state})
     });
-  }catch(e){
-    // Silencieux — le localStorage est déjà sauvegardé
-  }
+  }catch(e){}
 }
 
 async function loadFromKV(){
@@ -584,9 +582,7 @@ async function loadFromKV(){
     if(!res.ok)return;
     const data=await res.json();
     if(data.todo5&&data.todo5.tasks){
-      // Merger avec localStorage — prendre la version la plus récente
-      const local=JSON.parse(localStorage.getItem('todo5')||'null');
-      const localTime=local?local.lastSaved||0:0;
+      const localTime=state.lastSaved||0;
       const kvTime=data.todo5.lastSaved||0;
       if(kvTime>localTime){
         state=data.todo5;
@@ -595,18 +591,10 @@ async function loadFromKV(){
         if(document.getElementById('view-week').classList.contains('active'))renderWeek();
       }
     }
-  }catch(e){
-    // Pas de KV dispo — localStorage suffit
-  }
+  }catch(e){}
 }
 
 // Ajouter lastSaved au state à chaque save
-function save(){
-  state.lastSaved=Date.now();
-  localStorage.setItem('todo5',JSON.stringify(state));
-  clearTimeout(syncTimeout);
-  syncTimeout=setTimeout(syncToKV, 1500);
-}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pcol(name){
   // check events first for custom color
