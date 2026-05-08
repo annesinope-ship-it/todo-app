@@ -1615,10 +1615,17 @@ function importData(e){
   r.onload=ev=>{
     try{
       const imp=JSON.parse(ev.target.result);
-      if(!imp.tasks||!imp.projects)throw new Error();
+      if(!imp.tasks||!imp.projects)throw new Error('Format invalide');
       if(!confirm(`Importer ${imp.tasks.length} tâche(s) ?`))return;
+      // Compatibilité — ajouter lastSaved si absent
+      if(!imp.lastSaved)imp.lastSaved=Date.now();
+      if(!imp.team)imp.team=[];
+      if(!imp.nextMemberId)imp.nextMemberId=1;
+      if(!imp.events)imp.events=[];
+      if(!imp.nextEvId)imp.nextEvId=1;
+      if(!imp.flags)imp.flags=['Partenaires','Inscrits','Intervenants','Logistique','Communication'];
       state=imp;save();render();alert('✅ Import réussi !');
-    }catch(e){alert('❌ Fichier invalide.');}
+    }catch(e){alert('❌ Fichier invalide : '+e.message);}
     e.target.value='';
   };r.readAsText(file);
 }
