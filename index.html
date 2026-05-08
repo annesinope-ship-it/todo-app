@@ -492,6 +492,12 @@ const DAY_FULL=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche
 
 // ── SYNC — déclaré en premier car utilisé dès l'init ──
 let syncTimeout=null;
+let activeId=null,dragId=null,activeEvId=null,activeMemberId=null,currentSort='default';
+let weekOffset=0;
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+let secOpen={proj:true,flag:false};
+let colorPickerOpen=null;
+
 function save(){
   state.lastSaved=Date.now();
   localStorage.setItem('todo5',JSON.stringify(state));
@@ -577,9 +583,7 @@ save();
   }
 });
 
-let activeId=null,dragId=null,activeEvId=null,activeMemberId=null,currentSort='default';
-
-// Ajouter lastSaved au state à chaque save
+// ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pcol(name){
   // check events first for custom color
