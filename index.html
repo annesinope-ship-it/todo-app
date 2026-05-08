@@ -491,12 +491,12 @@ const DAY_NAMES=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 const DAY_FULL=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 
 // ── SYNC — déclaré en premier car utilisé dès l'init ──
-let syncTimeout=null;
-let activeId=null,dragId=null,activeEvId=null,activeMemberId=null,currentSort='default';
-let weekOffset=0;
-let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
-let secOpen={proj:true,flag:false};
-let colorPickerOpen=null;
+var syncTimeout=null;
+var activeId=null,dragId=null,activeEvId=null,activeMemberId=null,currentSort='default';
+var weekOffset=0;
+var calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+var secOpen={proj:true,flag:false};
+var colorPickerOpen=null;
 
 function save(){
   state.lastSaved=Date.now();
