@@ -1742,9 +1742,27 @@ document.getElementById('niProj2').addEventListener('keydown',e=>{if(e.key==='En
 document.getElementById('niFlag').addEventListener('keydown',e=>{if(e.key==='Enter')addFlag();});
 
 render();
-// Démarrer sur la page Événements
 switchView('events', document.querySelector('.nav-tab.active'));
-// Charger depuis KV en arrière-plan
+
+// Vérifier les tâches en retard au chargement
+(function checkOverdueTasks(){
+  const today = todayISO();
+  const overdue = state.tasks.filter(t => {
+    if(!t.bucket || t.status === 'done') return false;
+    // bucket est une date ISO passée
+    return t.bucket.match(/^\d{4}-\d{2}-\d{2}$/) && t.bucket < today;
+  });
+  if(overdue.length === 0) return;
+  const names = overdue.map(t => `• ${t.text}`).join('\n');
+  const msg = `${overdue.length} tâche${overdue.length>1?'s':''} non terminée${overdue.length>1?'s':''} :\n\n${names}\n\nReporter au aujourd'hui ?`;
+  if(confirm(msg)){
+    overdue.forEach(t => { t.bucket = today; });
+    save();
+    render();
+    if(document.getElementById('view-events').classList.contains('active')) renderTodayCol();
+  }
+})();
+
 loadFromKV();
 </script>
 </body>
