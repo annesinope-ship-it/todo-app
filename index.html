@@ -312,6 +312,7 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5;}
     <span class="hstat">🚨 <b id="hs-dead">0</b></span>
     <span class="hstat">📋 <b id="hs-total">0</b></span>
   </div>
+  <button id="overdueBtn" style="display:none;align-items:center;gap:5px;padding:4px 11px;border-radius:6px;border:none;background:#fde8e8;color:#b91c1c;font-family:'Karla',sans-serif;font-size:11px;font-weight:700;cursor:pointer;" title="Tâches non faites des jours précédents"></button>
   <div class="hactions">
     <div class="hdate" id="hdate"></div>
     <button class="hbtn imp" onclick="triggerImport()">⬆ Importer</button>
@@ -1116,7 +1117,12 @@ function renderWeek(){
   state.tasks.forEach(t=>{
     if(t.bucket==='dead'){
       deadTasks.push(t);
-      // No planned day — show in unplanned or today if urgent
+      // Afficher aussi dans le jour d'échéance si dans la semaine
+      if(t.due&&dayMap[t.due]!==undefined){
+        dayMap[t.due].push(t);
+      } else if(!t.due||dayMap[t.due]===undefined){
+        // Pas de date ou date hors semaine → non planifié
+      }
       return;
     }
     // bucket can be an ISO date (when dragged to a day) or null
@@ -1680,6 +1686,7 @@ function importData(e){
 // ── MAIN RENDER ──
 function render(){
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  if(typeof checkOverdueTasks==='function') checkOverdueTasks();
 
   // Proj select
   const ps=document.getElementById('niProj'),pv=ps.value;
@@ -1744,24 +1751,32 @@ document.getElementById('niFlag').addEventListener('keydown',e=>{if(e.key==='Ent
 render();
 switchView('events', document.querySelector('.nav-tab.active'));
 
-// Vérifier les tâches en retard au chargement
-(function checkOverdueTasks(){
+// Vérifier les tâches en retard — afficher badge dans le header
+function checkOverdueTasks(){
   const today = todayISO();
-  const overdue = state.tasks.filter(t => {
-    if(!t.bucket || t.status === 'done') return false;
-    // bucket est une date ISO passée
-    return t.bucket.match(/^\d{4}-\d{2}-\d{2}$/) && t.bucket < today;
-  });
-  if(overdue.length === 0) return;
-  const names = overdue.map(t => `• ${t.text}`).join('\n');
-  const msg = `${overdue.length} tâche${overdue.length>1?'s':''} non terminée${overdue.length>1?'s':''} :\n\n${names}\n\nReporter au aujourd'hui ?`;
-  if(confirm(msg)){
-    overdue.forEach(t => { t.bucket = today; });
-    save();
-    render();
-    if(document.getElementById('view-events').classList.contains('active')) renderTodayCol();
+  const overdue = state.tasks.filter(t =>
+    t.bucket && t.status !== 'done' &&
+    t.bucket.match(/^\d{4}-\d{2}-\d{2}$/) && t.bucket < today
+  );
+  const btn = document.getElementById('overdueBtn');
+  if(!btn) return;
+  if(overdue.length === 0){
+    btn.style.display = 'none';
+    return;
   }
-})();
+  btn.style.display = 'flex';
+  btn.textContent = `↩ ${overdue.length} en retard`;
+  btn.onclick = () => {
+    const names = overdue.map(t => `• ${t.text}`).join('\n');
+    if(confirm(`Reporter ${overdue.length} tâche${overdue.length>1?'s':''} à aujourd'hui ?\n\n${names}`)){
+      overdue.forEach(t => { t.bucket = today; });
+      save(); render();
+      if(document.getElementById('view-events').classList.contains('active')) renderTodayCol();
+      checkOverdueTasks();
+    }
+  };
+}
+checkOverdueTasks();
 
 loadFromKV();
 </script>
