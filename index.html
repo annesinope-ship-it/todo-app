@@ -1117,11 +1117,14 @@ function renderWeek(){
   state.tasks.forEach(t=>{
     if(t.bucket==='dead'){
       deadTasks.push(t);
-      // Afficher aussi dans le jour d'échéance si dans la semaine
-      if(t.due&&dayMap[t.due]!==undefined){
-        dayMap[t.due].push(t);
-      } else if(!t.due||dayMap[t.due]===undefined){
-        // Pas de date ou date hors semaine → non planifié
+      // Convertir la date d'échéance en ISO si nécessaire
+      let dueISO=t.due||'';
+      if(dueISO.includes('/')){
+        const [d,m,y]=dueISO.split('/');
+        dueISO=`${y}-${m}-${d}`;
+      }
+      if(dueISO&&dayMap[dueISO]!==undefined){
+        dayMap[dueISO].push(t);
       }
       return;
     }
