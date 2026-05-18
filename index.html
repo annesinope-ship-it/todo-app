@@ -631,12 +631,11 @@ function pcol(name){
 function todayISO(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString().split('T')[0];}
 function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
 function getMonday(offset=0){
-  const d=new Date();
-  d.setHours(12,0,0,0); // midi pour éviter les problèmes de fuseau
-  const dow=d.getDay();
-  const diff=dow===0?-6:1-dow;
-  d.setDate(d.getDate()+diff+offset*7);
-  return d;
+  const now=new Date();
+  const dow=now.getDay(); // 0=dim, 1=lun, ..., 6=sam
+  const diffToMon=dow===0?-6:1-dow; // nombre de jours pour aller au lundi
+  const mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()+diffToMon+offset*7);
+  return mon;
 }
 function isoDate(d){
   const y=d.getFullYear();
