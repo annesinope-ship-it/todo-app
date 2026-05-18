@@ -1120,11 +1120,15 @@ function renderWeek(){
       // Convertir la date d'échéance en ISO si nécessaire
       let dueISO=t.due||'';
       if(dueISO.includes('/')){
-        const [d,m,y]=dueISO.split('/');
-        dueISO=`${y}-${m}-${d}`;
+        const [dd,mm,yy]=dueISO.split('/');
+        dueISO=`${yy}-${mm}-${dd}`;
       }
       if(dueISO&&dayMap[dueISO]!==undefined){
+        // Date dans la semaine courante → afficher dans le bon jour
         dayMap[dueISO].push(t);
+      } else {
+        // Date hors semaine ou pas de date → Non planifié
+        unplanned.push(t);
       }
       return;
     }
