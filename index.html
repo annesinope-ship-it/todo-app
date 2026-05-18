@@ -1197,9 +1197,9 @@ function renderWeek(){
     const di=dueInfo(t.due);
     const urgent=isUrgent(t);
     const isDead=t.bucket==='dead';
-    const dueHtml=di?`<span class="${urgent?'kdue-red':'sdue normal'}" style="font-size:10px;">${urgent?'🚨 ':''}${isDead?'⏰ ':''} ${di.label}</span>`:'';
-    return`<div class="wcard ${activeId===t.id?'active':''} ${urgent?'urgent':''} ${extraClass}" data-tid="${t.id}"
-      draggable="true" style="border-left-color:${urgent?'var(--red)':isDead?'var(--dead-c)':color}"
+    const dueHtml=di?`<span class="${urgent||isDead?'kdue-red':'sdue normal'}" style="font-size:10px;">${urgent?'🚨 ':isDead?'⏰ ':''} ${di.label}</span>`:'';
+    return`<div class="wcard ${activeId===t.id?'active':''} ${urgent||isDead?'urgent':''} ${extraClass}" data-tid="${t.id}"
+      draggable="true" style="border-left-color:${urgent||isDead?'var(--dead-c)':color};${isDead?'background:#fff8f8;':''}"
       ondragstart="startDrag(event,${t.id})" onclick="openDetail(${t.id})">
       <div class="wname ${t.status==='done'?'done':''}">${esc(t.text)}</div>
       <div class="wmeta">
