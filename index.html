@@ -334,9 +334,9 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5;}
     <div class="sb-sec">
       <div class="sb-sec-h" onclick="toggleSec('proj')">
         <span class="sb-sec-lbl">Projets</span>
-        <span class="sb-sec-tog open" id="tog-proj">▶</span>
+        <span class="sb-sec-tog" id="tog-proj">▶</span>
       </div>
-      <div class="sb-sec-body" id="body-proj">
+      <div class="sb-sec-body" id="body-proj" style="display:none;">
         <div class="chips" id="projChips"></div>
         <div class="row" style="margin-top:0;">
           <input class="inp" id="niProj2" placeholder="Nouveau projet…" style="flex:1;"/>
@@ -528,7 +528,7 @@ var syncTimeout=null;
 var activeId=null,dragId=null,activeEvId=null,activeMemberId=null,currentSort='default';
 var weekOffset=0;
 var calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
-var secOpen={proj:true,flag:false};
+var secOpen={proj:false,flag:false};
 var colorPickerOpen=null;
 
 function save(){
