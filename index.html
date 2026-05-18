@@ -1155,17 +1155,15 @@ function renderWeek(){
   state.tasks.forEach(t=>{
     if(t.bucket==='dead'){
       deadTasks.push(t);
-      // Convertir la date d'échéance en ISO si nécessaire
       let dueISO=t.due||'';
       if(dueISO.includes('/')){
         const [dd,mm,yy]=dueISO.split('/');
         dueISO=`${yy}-${mm}-${dd}`;
       }
+      console.log('DEAD TASK:', t.text, 'due:', t.due, 'dueISO:', dueISO, 'inDayMap:', dayMap[dueISO]!==undefined, 'dayMapKeys:', Object.keys(dayMap));
       if(dueISO&&dayMap[dueISO]!==undefined){
-        // Date dans la semaine courante → afficher dans le bon jour
         dayMap[dueISO].push(t);
       } else {
-        // Date hors semaine ou pas de date → Non planifié
         unplanned.push(t);
       }
       return;
