@@ -163,7 +163,14 @@ header h1{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;letter-sp
 .ev-task-name{font-size:12px;flex:1;line-height:1.4;}
 .ev-task-name.done{text-decoration:line-through;color:var(--ink3);}
 .ev-no-tasks{font-size:12px;color:var(--ink3);font-family:'Syne',sans-serif;padding:6px 0;}
-/* Quick add task in event */
+/* Quick add floating button */
+.fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--brand);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;z-index:1000;transition:transform .15s,box-shadow .15s;}
+.fab:hover{transform:scale(1.08);box-shadow:0 6px 20px rgba(0,0,0,.25);}
+.quick-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:999;display:none;align-items:flex-start;justify-content:center;padding-top:80px;}
+.quick-modal-overlay.open{display:flex;}
+.quick-modal{background:var(--w);border-radius:14px;padding:20px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px;}
+.quick-modal h3{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;margin-bottom:2px;}
+.quick-modal-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:4px;}
 .ev-quick-add{display:flex;gap:6px;margin-top:8px;}
 .ev-quick-inp{flex:1;padding:6px 9px;border:1px solid var(--b);border-radius:7px;font-family:'Karla',sans-serif;font-size:12px;background:var(--bg);color:var(--ink);outline:none;}
 .ev-quick-inp:focus{border-color:var(--ink);background:#fff;}
@@ -1548,11 +1555,52 @@ function render(){
   if(vid==='checklist')renderChecklist();
 }
 
+// ── QUICK ADD ──
+function openQuickAdd(){
+  const overlay=document.getElementById('quickModalOverlay');
+  const ps=document.getElementById('qa-proj');
+  ps.innerHTML='<option value="">— Projet (optionnel) —</option>'+state.projects.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  // Pre-select current event if on events view
+  if(activeEvId){const ev=state.events.find(e=>e.id===activeEvId);if(ev&&ev.name){ps.value=ev.name;}}
+  document.getElementById('qa-text').value='';
+  document.getElementById('qa-due').value='';
+  overlay.classList.add('open');
+  setTimeout(()=>document.getElementById('qa-text').focus(),50);
+}
+function closeQuickAdd(){
+  document.getElementById('quickModalOverlay').classList.remove('open');
+}
+function submitQuickAdd(){
+  const text=document.getElementById('qa-text').value.trim();if(!text)return;
+  const proj=document.getElementById('qa-proj').value;
+  const due=document.getElementById('qa-due').value;
+  const t={id:state.nextId++,text,project:proj,bucket:null,status:'todo',due:due||'',comments:''};
+  state.tasks.push(t);save();closeQuickAdd();render();openDetail(t.id);
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeQuickAdd();
+  if(e.key==='n'&&!e.target.matches('input,textarea,select'))openQuickAdd();
+});
+
 // ── INIT ──
 syncProjectsToEvents();
 render();
 switchView('events',document.querySelector('.nav-tab.active'));
 loadFromKV();
 </script>
+<!-- Quick add modal -->
+<div class="quick-modal-overlay" id="quickModalOverlay" onclick="if(event.target===this)closeQuickAdd()">
+  <div class="quick-modal">
+    <h3>+ Nouvelle tâche</h3>
+    <input class="inp" id="qa-text" placeholder="Titre de la tâche…" onkeydown="if(event.key==='Enter')submitQuickAdd()"/>
+    <select class="inp" id="qa-proj"></select>
+    <input class="inp" type="date" id="qa-due"/>
+    <div class="quick-modal-actions">
+      <button class="btn btn-soft" onclick="closeQuickAdd()">Annuler</button>
+      <button class="btn btn-ink" onclick="submitQuickAdd()">Ajouter</button>
+    </div>
+  </div>
+</div>
+<button class="fab" onclick="openQuickAdd()" title="Nouvelle tâche">+</button>
 </body>
 </html>
