@@ -994,7 +994,34 @@ function deleteEvent(id){
 function openEventById(id){activeEvId=Number(id);renderEventsList();renderEventDetail();}
 function updateEvName(id,val){const ev=state.events.find(e=>e.id===id);if(ev){ev.name=val;save();renderEventsList();}}
 function updateEvNotes(id,val){const ev=state.events.find(e=>e.id===id);if(ev){ev.notes=val;save();}}
-function updateEvNotesCat(id,cat,val){const ev=state.events.find(e=>e.id===id);if(!ev)return;if(!ev.notesCats)ev.notesCats={};ev.notesCats[cat]=val;save();}
+var evNotesTimers={};
+function autosaveEvNotes(evId,val){
+  clearTimeout(evNotesTimers[evId]);
+  evNotesTimers[evId]=setTimeout(()=>{
+    const ev=state.events.find(e=>e.id===evId);if(!ev)return;
+    if(!ev.notesCats)ev.notesCats={};
+    // Archive previous non-empty content if different
+    const prev=ev.notesCats['Global']||ev.notes||'';
+    if(prev&&prev.trim()&&prev.trim()!==val.trim()){
+      if(!ev.notesHistory)ev.notesHistory=[];
+      // Only archive if not already the last entry
+      const lastEntry=ev.notesHistory[0];
+      if(!lastEntry||lastEntry.text!==prev.trim()){
+        ev.notesHistory.unshift({date:new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),text:prev.trim()});
+        // Keep max 20 entries
+        if(ev.notesHistory.length>20)ev.notesHistory=ev.notesHistory.slice(0,20);
+      }
+    }
+    ev.notesCats['Global']=val;ev.notes=val;
+    save();
+    const ind=document.getElementById(`ev-autosave-ind-${evId}`);
+    if(ind){ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2000);}
+  },800);
+}
+function deleteEvNote(evId,idx){
+  const ev=state.events.find(e=>e.id===evId);if(!ev||!ev.notesHistory)return;
+  ev.notesHistory.splice(idx,1);save();renderEventDetail();
+}
 function addNoteCategory(evId){
   const name=prompt('Nom de la catégorie :');if(!name||!name.trim())return;
   const ev=state.events.find(e=>e.id===evId);if(!ev)return;
@@ -1073,21 +1100,25 @@ function renderEventDetail(){
   const pickerHtml=colorPickerOpen===ev.id?`<div class="ev-color-picker">${EV_COLORS.map(c=>`<div class="ev-color-swatch ${c===col?'sel':''}" style="background:${c};" onclick="setEvColor(${ev.id},'${c}')"></div>`).join('')}</div>`:'';
   const DEFAULT_NOTE_CATS=['Global','Informations importantes'];
   if(!ev.notesCats)ev.notesCats={};
-  const allCats=[...new Set([...DEFAULT_NOTE_CATS,...Object.keys(ev.notesCats)])];
+  if(!ev.notesHistory)ev.notesHistory=[];
   const notesSectionHtml=`<div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <div class="ev-lbl">Notes & informations</div>
-      <button onclick="addNoteCategory(${ev.id})" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--b);background:var(--bg);cursor:pointer;font-family:'Karla',sans-serif;font-weight:600;color:var(--ink2);">+ Cat.</button>
+      <span id="ev-autosave-ind-${ev.id}" style="font-size:10px;color:var(--s-done);opacity:0;transition:opacity .3s;font-family:'Syne',sans-serif;">✓ Sauvegardé</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
-      ${allCats.map(cat=>`<div>
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink2);font-family:'Syne',sans-serif;">${esc(cat)}</span>
-          ${!DEFAULT_NOTE_CATS.includes(cat)?`<span onclick="removeNoteCategory(${ev.id},'${cat.replace(/'/g,"\\'")}'" style="cursor:pointer;color:var(--ink3);font-size:10px;margin-left:auto;">✕</span>`:''}
-        </div>
-        <textarea class="ev-notes" style="min-height:80px;width:100%;" placeholder="${esc(cat)}…" oninput="updateEvNotesCat(${ev.id},'${cat.replace(/'/g,"\\'")}',this.value)">${esc(ev.notesCats[cat]||'')}</textarea>
-      </div>`).join('')}
-    </div>
+    <textarea class="ev-notes" id="ev-notes-${ev.id}" style="min-height:160px;width:100%;font-size:13px;" placeholder="Notes libres — sauvegarde automatique…" oninput="autosaveEvNotes(${ev.id},this.value)">${esc(ev.notesCats['Global']||ev.notes||'')}</textarea>
+    ${ev.notesHistory&&ev.notesHistory.length>0?`
+    <div style="margin-top:12px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink3);font-family:'Syne',sans-serif;margin-bottom:6px;">Historique</div>
+      ${ev.notesHistory.map((h,i)=>`
+        <div style="background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:9px 12px;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+            <span style="font-size:10px;font-weight:700;font-family:'Syne',sans-serif;color:var(--ink2);">📋 ${h.date}</span>
+            <span style="cursor:pointer;color:var(--ink3);font-size:11px;margin-left:auto;" onclick="deleteEvNote(${ev.id},${i})">✕</span>
+          </div>
+          <div style="font-size:12px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;">${esc(h.text)}</div>
+        </div>`).join('')}
+    </div>`:''}
   </div>`;
   // Team section
   const members=state.team.filter(m=>(m.tasks||[]).some(t=>t.project===ev.name));
@@ -1319,8 +1350,15 @@ function savePoint(memberId){
   } else {
     m.points.unshift({date:todayISO(),notes,tasks:newPointTasks.slice()});
     newPointTasks.forEach(pt=>{
-      if(!m.tasks)m.tasks=[];if(!m.nextTaskId)m.nextTaskId=1;
-      m.tasks.push({id:m.nextTaskId++,text:pt.text||pt,done:false,due:'',project:pt.project||'',createdAt:todayISO()});
+      if(!m.tasks)m.tasks=[];
+      if(!m.nextTaskId)m.nextTaskId=(m.tasks.reduce((max,t)=>Math.max(max,t.id||0),0))+1;
+      const text=typeof pt==='object'?pt.text:pt;
+      const proj=typeof pt==='object'?pt.project||'':'';
+      if(!text)return;
+      // Avoid duplicates
+      if(!m.tasks.some(t=>t.text===text&&(t.project||'')===(proj||'')&&!t.done)){
+        m.tasks.push({id:m.nextTaskId++,text,done:false,due:'',project:proj,createdAt:todayISO()});
+      }
     });
   }
   newPointNotes='';newPointTasks=[];editingPointIdx=null;
