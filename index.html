@@ -416,8 +416,14 @@ textarea.fi{resize:vertical;min-height:65px;line-height:1.5;}
     <div class="checklist-wrap">
       <div class="checklist-toolbar">
         <span style="font-family:'Syne',sans-serif;font-size:12px;font-weight:800;">Checklist Logistique</span>
+        <button class="btn btn-soft" style="font-size:11px;" onclick="openClManage()">⚙ Gérer les colonnes</button>
         <button class="btn btn-soft" style="font-size:11px;margin-left:auto;" onclick="addChecklistCategory()">+ Catégorie</button>
         <button class="btn btn-soft" style="font-size:11px;" onclick="addChecklistItem()">+ Étape</button>
+      </div>
+      <!-- Manage columns panel -->
+      <div id="clManagePanel" style="display:none;background:var(--w);border-bottom:1px solid var(--b2);padding:12px 16px;">
+        <div style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink3);margin-bottom:10px;">Colonnes — glisser pour réordonner · 👁 masquer · 📦 archiver</div>
+        <div id="clColsList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
       <div class="checklist-table-wrap">
         <table class="cl-table" id="clTable"></table>
@@ -851,7 +857,10 @@ function addChecklistItem(){
   save();renderChecklist();
 }
 function clCycle(catIdx,itemIdx,projIdx){
-  const projs=state.projects.filter(p=>state.events.find(e=>e.name===p));
+  if(!state.clOrder)state.clOrder=[];if(!state.clHidden)state.clHidden=[];if(!state.clArchived)state.clArchived=[];
+  const allProjs=state.projects.filter(p=>state.events.find(e=>e.name===p)&&!state.clArchived.includes(p));
+  state.clOrder=state.clOrder.filter(p=>allProjs.includes(p));
+  const projs=state.clOrder.filter(p=>!state.clHidden.includes(p));
   const projName=projs[projIdx];if(!projName)return;
   const key=`${catIdx}_${itemIdx}_${projName}`;
   const cur=state.checklist[key]||'todo';
@@ -864,20 +873,106 @@ function clCycle(catIdx,itemIdx,projIdx){
     btn.textContent={todo:'—',wip:'En cours',ok:'✓ OK',na:'N/A'}[next]||'—';
   }
 }
+function openClManage(){
+  const panel=document.getElementById('clManagePanel');
+  panel.style.display=panel.style.display==='none'?'block':'none';
+  if(panel.style.display==='block')renderClManage();
+}
+
+function renderClManage(){
+  const list=document.getElementById('clColsList');if(!list)return;
+  if(!state.clOrder)state.clOrder=[];
+  if(!state.clHidden)state.clHidden=[];
+  if(!state.clArchived)state.clArchived=[];
+  // Build ordered project list
+  const allProjs=state.projects.filter(p=>state.events.find(e=>e.name===p)&&!state.clArchived.includes(p));
+  // Add any new projects not yet in order
+  allProjs.forEach(p=>{if(!state.clOrder.includes(p))state.clOrder.push(p);});
+  // Remove deleted from order
+  state.clOrder=state.clOrder.filter(p=>allProjs.includes(p));
+  list.innerHTML=state.clOrder.map((p,i)=>{
+    const ev=state.events.find(e=>e.name===p);
+    const col=ev?ev.color:'#ccc';
+    const hidden=state.clHidden.includes(p);
+    const abbr=(state.clAbbr&&state.clAbbr[p])||p.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4);
+    return`<div draggable="true" ondragstart="clColDragStart(event,${i})" ondragover="clColDragOver(event,${i})" ondrop="clColDrop(event,${i})"
+      style="display:flex;align-items:center;gap:5px;background:${hidden?'var(--bg)':col+'22'};border:1px solid ${col}44;border-radius:8px;padding:5px 10px;cursor:grab;${hidden?'opacity:.5;':''}">
+      <span style="font-size:11px;color:var(--ink3);">⠿</span>
+      <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;"></span>
+      <span style="font-size:11px;font-family:'Syne',sans-serif;font-weight:700;color:${col};">${abbr}</span>
+      <span style="font-size:10px;color:var(--ink2);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(p)}">${esc(p)}</span>
+      <button onclick="toggleClCol('${p.replace(/'/g,"\\'")}',event)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;" title="${hidden?'Afficher':'Masquer'}">${hidden?'👁‍🗨':'👁'}</button>
+      <button onclick="archiveClCol('${p.replace(/'/g,"\\'")}',event)" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;" title="Archiver">📦</button>
+    </div>`;
+  }).join('')+
+  (state.clArchived.length>0?`<div style="width:100%;margin-top:8px;font-size:10px;color:var(--ink3);font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;">Archivés</div>`+
+  state.clArchived.map(p=>{
+    const ev=state.events.find(e=>e.name===p);const col=ev?ev.color:'#ccc';
+    const abbr=(state.clAbbr&&state.clAbbr[p])||p.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4);
+    return`<div style="display:flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:5px 10px;opacity:.5;">
+      <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;"></span>
+      <span style="font-size:11px;font-family:'Syne',sans-serif;color:var(--ink3);">${abbr} — ${esc(p)}</span>
+      <button onclick="restoreClCol('${p.replace(/'/g,"\\'")}',event)" style="background:none;border:none;cursor:pointer;font-size:11px;color:#1a5fc9;font-weight:700;padding:0 2px;">↩ Restaurer</button>
+    </div>`;
+  }).join(''):'');
+}
+
+var clDragIdx=null;
+function clColDragStart(e,i){clDragIdx=i;e.dataTransfer.effectAllowed='move';}
+function clColDragOver(e,i){e.preventDefault();}
+function clColDrop(e,i){
+  e.preventDefault();if(clDragIdx===null||clDragIdx===i)return;
+  const item=state.clOrder.splice(clDragIdx,1)[0];
+  state.clOrder.splice(i,0,item);
+  clDragIdx=null;save();renderClManage();renderChecklist();
+}
+function toggleClCol(p,e){
+  e.stopPropagation();
+  if(!state.clHidden)state.clHidden=[];
+  const idx=state.clHidden.indexOf(p);
+  if(idx>=0)state.clHidden.splice(idx,1);else state.clHidden.push(p);
+  save();renderClManage();renderChecklist();
+}
+function archiveClCol(p,e){
+  e.stopPropagation();
+  if(!confirm(`Archiver "${p}" dans la checklist ?`))return;
+  if(!state.clArchived)state.clArchived=[];
+  if(!state.clOrder)state.clOrder=[];
+  state.clOrder=state.clOrder.filter(x=>x!==p);
+  state.clArchived.push(p);
+  save();renderClManage();renderChecklist();
+}
+function restoreClCol(p,e){
+  e.stopPropagation();
+  if(!state.clArchived)return;
+  state.clArchived=state.clArchived.filter(x=>x!==p);
+  if(!state.clOrder)state.clOrder=[];
+  state.clOrder.push(p);
+  save();renderClManage();renderChecklist();
+}
+
 function editClAbbr(projName){
-  const current=state.clAbbr&&state.clAbbr[projName]||'';
+  const current=(state.clAbbr&&state.clAbbr[projName])||'';
   const val=prompt(`Abréviation pour "${projName}" :`,current);
   if(val===null)return;
   if(!state.clAbbr)state.clAbbr={};
   state.clAbbr[projName]=val.trim().toUpperCase().slice(0,6)||projName.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4);
   save();renderChecklist();
 }
+
 function renderChecklist(){
   const table=document.getElementById('clTable');if(!table)return;
   const def=getChecklistDef();
-  const projs=state.projects.filter(p=>state.events.find(e=>e.name===p));
+  if(!state.clOrder)state.clOrder=[];
+  if(!state.clHidden)state.clHidden=[];
+  if(!state.clArchived)state.clArchived=[];
+  // Build ordered visible projects
+  const allProjs=state.projects.filter(p=>state.events.find(e=>e.name===p)&&!state.clArchived.includes(p));
+  allProjs.forEach(p=>{if(!state.clOrder.includes(p))state.clOrder.push(p);});
+  state.clOrder=state.clOrder.filter(p=>allProjs.includes(p));
+  const projs=state.clOrder.filter(p=>!state.clHidden.includes(p));
   if(projs.length===0){
-    table.innerHTML='<tr><td style="padding:20px;color:var(--ink3);font-family:Syne,sans-serif;font-size:12px;">Ajoute des projets/événements pour voir la checklist</td></tr>';
+    table.innerHTML='<tr><td style="padding:20px;color:var(--ink3);font-family:Syne,sans-serif;font-size:12px;">Aucune colonne visible — clique sur ⚙ pour gérer</td></tr>';
     return;
   }
   let html=`<thead><tr><th>Prestataire</th><th>Étape</th>${projs.map((p,pi)=>{
