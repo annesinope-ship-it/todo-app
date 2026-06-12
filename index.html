@@ -850,45 +850,51 @@ function addChecklistItem(){
   state.checklistDef[idx].items.push(item.trim());
   save();renderChecklist();
 }
-function clCycle(catIdx,itemIdx,projName){
+function clCycle(catIdx,itemIdx,projIdx){
+  const projs=state.projects.filter(p=>state.events.find(e=>e.name===p));
+  const projName=projs[projIdx];if(!projName)return;
   const key=`${catIdx}_${itemIdx}_${projName}`;
   const cur=state.checklist[key]||'todo';
   const next={todo:'wip',wip:'ok',ok:'na',na:'todo'}[cur]||'todo';
   state.checklist[key]=next;
   save();
-  // Update just the button
-  const btn=document.getElementById(`cl_${catIdx}_${itemIdx}_${CSS.escape(projName)}`);
+  const btn=document.getElementById(`cl_${catIdx}_${itemIdx}_${projIdx}`);
   if(btn){
     btn.className=`cl-btn ${next}`;
     btn.textContent={todo:'—',wip:'En cours',ok:'✓ OK',na:'N/A'}[next]||'—';
   }
 }
+function editClAbbr(projName){
+  const current=state.clAbbr&&state.clAbbr[projName]||'';
+  const val=prompt(`Abréviation pour "${projName}" :`,current);
+  if(val===null)return;
+  if(!state.clAbbr)state.clAbbr={};
+  state.clAbbr[projName]=val.trim().toUpperCase().slice(0,6)||projName.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4);
+  save();renderChecklist();
+}
 function renderChecklist(){
   const table=document.getElementById('clTable');if(!table)return;
   const def=getChecklistDef();
-  // Only show projects that have events
   const projs=state.projects.filter(p=>state.events.find(e=>e.name===p));
   if(projs.length===0){
     table.innerHTML='<tr><td style="padding:20px;color:var(--ink3);font-family:Syne,sans-serif;font-size:12px;">Ajoute des projets/événements pour voir la checklist</td></tr>';
     return;
   }
-  let html=`<thead><tr><th>Prestataire</th><th>Étape</th>${projs.map(p=>{
+  let html=`<thead><tr><th>Prestataire</th><th>Étape</th>${projs.map((p,pi)=>{
     const ev=state.events.find(e=>e.name===p);
     const col=ev?ev.color:'#ccc';
-    // Abbreviation : initiales
-    const abbr=p.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4)||p.slice(0,4).toUpperCase();
-    return`<th style="background:${col};min-width:80px;" title="${esc(p)}">${abbr}</th>`;
+    const abbr=(state.clAbbr&&state.clAbbr[p])||p.split(' ').filter(w=>w.length>2).map(w=>w[0]).join('').toUpperCase().slice(0,4)||p.slice(0,4).toUpperCase();
+    return`<th style="background:${col};min-width:80px;cursor:pointer;" title="${esc(p)} — clic pour modifier l'abréviation" onclick="editClAbbr('${p.replace(/'/g,"\\'")}')">${abbr} ✎</th>`;
   }).join('')}</tr></thead><tbody>`;
   def.forEach((cat,ci)=>{
     html+=`<tr class="cl-cat-row"><td colspan="${projs.length+2}">${esc(cat.cat)}</td></tr>`;
     cat.items.forEach((item,ii)=>{
       html+=`<tr><td></td><td>${esc(item)}</td>`;
-      projs.forEach(p=>{
+      projs.forEach((p,pi)=>{
         const key=`${ci}_${ii}_${p}`;
         const st=state.checklist[key]||'todo';
         const label={todo:'—',wip:'En cours',ok:'✓ OK',na:'N/A'}[st]||'—';
-        const safeId=`cl_${ci}_${ii}_${p.replace(/[^a-z0-9]/gi,'_')}`;
-        html+=`<td><div class="cl-status"><button class="cl-btn ${st}" id="${safeId}" onclick="clCycle(${ci},${ii},'${p.replace(/'/g,"\\'")}')">${label}</button></div></td>`;
+        html+=`<td><div class="cl-status"><button class="cl-btn ${st}" id="cl_${ci}_${ii}_${pi}" onclick="clCycle(${ci},${ii},${pi})">${label}</button></div></td>`;
       });
       html+='</tr>';
     });
