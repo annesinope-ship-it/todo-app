@@ -1351,7 +1351,17 @@ function renderTodayCol(){
 // ── OVERDUE ──
 function checkOverdueTasks(){
   const today=todayISO();
-  const overdue=state.tasks.filter(t=>t.bucket&&t.status!=='done'&&t.bucket.match(/^\d{4}-\d{2}-\d{2}$/)&&t.bucket<today);
+  const allOverdue=state.tasks.filter(t=>
+    t.bucket&&t.status!=='done'&&
+    t.bucket.match(/^\d{4}-\d{2}-\d{2}$/)&&
+    t.bucket<today
+  );
+  // Auto-move wip/blocked without asking
+  const autoMove=allOverdue.filter(t=>t.status==='wip'||t.status==='blocked');
+  autoMove.forEach(t=>{t.bucket=today;});
+  if(autoMove.length>0)save();
+  // Ask for todo tasks
+  const overdue=allOverdue.filter(t=>t.status==='todo');
   const btn=document.getElementById('overdueBtn');if(!btn)return;
   if(overdue.length===0){btn.style.display='none';return;}
   btn.style.display='flex';btn.textContent=`↩ ${overdue.length} en retard`;
@@ -1359,6 +1369,7 @@ function checkOverdueTasks(){
     const names=overdue.map(t=>`• ${t.text}`).join('\n');
     if(confirm(`Reporter ${overdue.length} tâche${overdue.length>1?'s':''} à aujourd'hui ?\n\n${names}`)){
       overdue.forEach(t=>{t.bucket=today;});save();render();
+      btn.style.display='none';
     }
   };
 }
