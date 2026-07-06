@@ -1097,24 +1097,39 @@ function updateEvName(id,val){const ev=state.events.find(e=>e.id===id);if(ev){ev
 function updateEvNotes(id,val){const ev=state.events.find(e=>e.id===id);if(ev){ev.notes=val;save();}}
 var evNotesTimers={};
 function autosaveEvNotes(evId,val){
+  // Sauvegarde silencieuse du brouillon en cours (sans archiver)
   clearTimeout(evNotesTimers[evId]);
   evNotesTimers[evId]=setTimeout(()=>{
     const ev=state.events.find(e=>e.id===evId);if(!ev)return;
     if(!ev.notesCats)ev.notesCats={};
-    // Archive previous non-empty content if different
-    const prev=ev.notesCats['Global']||ev.notes||'';
-    if(prev&&prev.trim()&&prev.trim()!==val.trim()){
-      if(!ev.notesHistory)ev.notesHistory=[];
-      // Only archive if not already the last entry
-      const lastEntry=ev.notesHistory[0];
-      if(!lastEntry||lastEntry.text!==prev.trim()){
-        ev.notesHistory.unshift({date:new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),text:prev.trim()});
-        // Keep max 20 entries
-        if(ev.notesHistory.length>20)ev.notesHistory=ev.notesHistory.slice(0,20);
-      }
-    }
     ev.notesCats['Global']=val;ev.notes=val;
     save();
+    const ind=document.getElementById(`ev-autosave-ind-${evId}`);
+    if(ind){ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2000);}
+  },800);
+}
+function archiveEvJournal(evId,val){
+  // Archive seulement au blur si le contenu est vraiment différent de la dernière entrée
+  const ev=state.events.find(e=>e.id===evId);if(!ev)return;
+  const text=val.trim();if(!text)return;
+  if(!ev.notesHistory)ev.notesHistory=[];
+  const last=ev.notesHistory[0];
+  if(last&&last.text===text)return; // Pas de doublon
+  const dateStr=new Date().toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  ev.notesHistory.unshift({date:dateStr,text});
+  if(ev.notesHistory.length>50)ev.notesHistory=ev.notesHistory.slice(0,50);
+  // Vider le champ journal après archivage
+  const el=document.getElementById(`ev-journal-${evId}`);
+  if(el)el.value='';
+  ev.journalDraft='';
+  save();renderEventDetail();
+}
+function autosaveEvFixed(evId,val){
+  // Note fixe — sauvegarde simple sans archivage
+  clearTimeout(evNotesTimers['fixed_'+evId]);
+  evNotesTimers['fixed_'+evId]=setTimeout(()=>{
+    const ev=state.events.find(e=>e.id===evId);if(!ev)return;
+    ev.noteFixed=val;save();
     const ind=document.getElementById(`ev-autosave-ind-${evId}`);
     if(ind){ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2000);}
   },800);
@@ -1199,27 +1214,38 @@ function renderEventDetail(){
   const deadTasks=tasks.filter(t=>t.due).sort((a,b)=>a.due<b.due?-1:1);
   const normalTasks=tasks.filter(t=>!t.due);
   const pickerHtml=colorPickerOpen===ev.id?`<div class="ev-color-picker">${EV_COLORS.map(c=>`<div class="ev-color-swatch ${c===col?'sel':''}" style="background:${c};" onclick="setEvColor(${ev.id},'${c}')"></div>`).join('')}</div>`:'';
-  const DEFAULT_NOTE_CATS=['Global','Informations importantes'];
-  if(!ev.notesCats)ev.notesCats={};
   if(!ev.notesHistory)ev.notesHistory=[];
-  const notesSectionHtml=`<div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div class="ev-lbl">Notes & informations</div>
-      <span id="ev-autosave-ind-${ev.id}" style="font-size:10px;color:var(--s-done);opacity:0;transition:opacity .3s;font-family:'Syne',sans-serif;">✓ Sauvegardé</span>
-    </div>
-    <textarea class="ev-notes" id="ev-notes-${ev.id}" style="min-height:160px;width:100%;font-size:13px;" placeholder="Notes libres — sauvegarde automatique…" oninput="autosaveEvNotes(${ev.id},this.value)">${esc(ev.notesCats['Global']||ev.notes||'')}</textarea>
-    ${ev.notesHistory&&ev.notesHistory.length>0?`
-    <div style="margin-top:12px;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink3);font-family:'Syne',sans-serif;margin-bottom:6px;">Historique</div>
-      ${ev.notesHistory.map((h,i)=>`
-        <div style="background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:9px 12px;margin-bottom:6px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-            <span style="font-size:10px;font-weight:700;font-family:'Syne',sans-serif;color:var(--ink2);">📋 ${h.date}</span>
+  const notesSectionHtml=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <!-- Journal d'actions (gauche) -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="ev-lbl">📋 Journal d'actions</div>
+        <span id="ev-autosave-ind-${ev.id}" style="font-size:10px;color:var(--s-done);opacity:0;transition:opacity .3s;font-family:'Syne',sans-serif;">✓ Sauvegardé</span>
+      </div>
+      <textarea class="ev-notes" id="ev-journal-${ev.id}" style="min-height:100px;width:100%;font-size:13px;" placeholder="Note une action, une info reçue… Appuie sur Tab pour archiver avec la date."
+        oninput="autosaveEvNotes(${ev.id},this.value)"
+        onkeydown="if(event.key==='Tab'){event.preventDefault();archiveEvJournal(${ev.id},this.value);}"
+        onblur="archiveEvJournal(${ev.id},this.value)"
+      >${esc(ev.journalDraft||'')}</textarea>
+      <div style="font-size:10px;color:var(--ink3);font-family:'Syne',sans-serif;">Tab ou clic ailleurs → archive avec la date</div>
+      ${ev.notesHistory.length>0?`<div style="display:flex;flex-direction:column;gap:5px;max-height:280px;overflow-y:auto;">
+        ${ev.notesHistory.map((h,i)=>`<div style="background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:8px 11px;">
+          <div style="display:flex;align-items:center;margin-bottom:4px;">
+            <span style="font-size:10px;font-weight:700;font-family:'Syne',sans-serif;color:var(--ink2);">📅 ${h.date}</span>
             <span style="cursor:pointer;color:var(--ink3);font-size:11px;margin-left:auto;" onclick="deleteEvNote(${ev.id},${i})">✕</span>
           </div>
           <div style="font-size:12px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;">${esc(h.text)}</div>
         </div>`).join('')}
-    </div>`:''}
+      </div>`:''}
+    </div>
+    <!-- Note fixe (droite) -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="ev-lbl">📌 Note permanente</div>
+      <textarea class="ev-notes" style="min-height:100px;width:100%;font-size:13px;flex:1;" placeholder="Infos permanentes : contacts, briefing, points récurrents avec l'équipe LOSAM…"
+        oninput="autosaveEvFixed(${ev.id},this.value)"
+      >${esc(ev.noteFixed||ev.notesCats?.['Informations importantes']||'')}</textarea>
+      <div style="font-size:10px;color:var(--ink3);font-family:'Syne',sans-serif;">Sauvegarde automatique — ne s'archive pas</div>
+    </div>
   </div>`;
   // Team section
   const members=state.team.filter(m=>(m.tasks||[]).some(t=>t.project===ev.name));
