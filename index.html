@@ -1109,16 +1109,14 @@ function autosaveEvNotes(evId,val){
   },800);
 }
 function archiveEvJournal(evId,val){
-  // Archive seulement au blur si le contenu est vraiment différent de la dernière entrée
   const ev=state.events.find(e=>e.id===evId);if(!ev)return;
   const text=val.trim();if(!text)return;
   if(!ev.notesHistory)ev.notesHistory=[];
   const last=ev.notesHistory[0];
-  if(last&&last.text===text)return; // Pas de doublon
+  if(last&&last.text===text)return;
   const dateStr=new Date().toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   ev.notesHistory.unshift({date:dateStr,text});
   if(ev.notesHistory.length>50)ev.notesHistory=ev.notesHistory.slice(0,50);
-  // Vider le champ journal après archivage
   const el=document.getElementById(`ev-journal-${evId}`);
   if(el)el.value='';
   ev.journalDraft='';
@@ -1133,6 +1131,27 @@ function autosaveEvFixed(evId,val){
     const ind=document.getElementById(`ev-autosave-ind-${evId}`);
     if(ind){ind.style.opacity='1';setTimeout(()=>{ind.style.opacity='0';},2000);}
   },800);
+}
+function editEvJournalEntry(evId,idx){
+  const ev=state.events.find(e=>e.id===evId);if(!ev||!ev.notesHistory)return;
+  const entry=ev.notesHistory[idx];if(!entry)return;
+  const textEl=document.getElementById(`ev-journal-text-${evId}-${idx}`);if(!textEl)return;
+  // Replace text with editable textarea
+  const orig=entry.text;
+  textEl.innerHTML=`<textarea style="width:100%;min-height:60px;padding:5px;border:1px solid var(--b);border-radius:5px;font-family:'Karla',sans-serif;font-size:12px;background:#fff;resize:vertical;">${esc(orig)}</textarea>
+    <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:4px;">
+      <button class="btn btn-soft" style="font-size:10px;padding:3px 8px;" onclick="cancelEditEvJournal(${evId},${idx},'${orig.replace(/'/g,"\\'")}')">Annuler</button>
+      <button class="btn btn-ink" style="font-size:10px;padding:3px 8px;" onclick="saveEditEvJournal(${evId},${idx},this.parentElement.previousElementSibling.value)">💾 Sauvegarder</button>
+    </div>`;
+}
+function cancelEditEvJournal(evId,idx,orig){
+  const textEl=document.getElementById(`ev-journal-text-${evId}-${idx}`);if(!textEl)return;
+  textEl.innerHTML=`<span style="font-size:12px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;">${esc(orig)}</span>`;
+}
+function saveEditEvJournal(evId,idx,val){
+  const ev=state.events.find(e=>e.id===evId);if(!ev||!ev.notesHistory)return;
+  ev.notesHistory[idx].text=val.trim();
+  save();renderEventDetail();
 }
 function deleteEvNote(evId,idx){
   const ev=state.events.find(e=>e.id===evId);if(!ev||!ev.notesHistory)return;
@@ -1222,19 +1241,22 @@ function renderEventDetail(){
         <div class="ev-lbl">📋 Journal d'actions</div>
         <span id="ev-autosave-ind-${ev.id}" style="font-size:10px;color:var(--s-done);opacity:0;transition:opacity .3s;font-family:'Syne',sans-serif;">✓ Sauvegardé</span>
       </div>
-      <textarea class="ev-notes" id="ev-journal-${ev.id}" style="min-height:100px;width:100%;font-size:13px;" placeholder="Note une action, une info reçue… Appuie sur Tab pour archiver avec la date."
+      <textarea class="ev-notes" id="ev-journal-${ev.id}" style="min-height:100px;width:100%;font-size:13px;" placeholder="Note une action, une info reçue…"
         oninput="autosaveEvNotes(${ev.id},this.value)"
-        onkeydown="if(event.key==='Tab'){event.preventDefault();archiveEvJournal(${ev.id},this.value);}"
-        onblur="archiveEvJournal(${ev.id},this.value)"
       >${esc(ev.journalDraft||'')}</textarea>
-      <div style="font-size:10px;color:var(--ink3);font-family:'Syne',sans-serif;">Tab ou clic ailleurs → archive avec la date</div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-ink" style="font-size:11px;padding:5px 12px;" onclick="archiveEvJournal(${ev.id},document.getElementById('ev-journal-${ev.id}').value)">📋 Archiver avec la date</button>
+      </div>
       ${ev.notesHistory.length>0?`<div style="display:flex;flex-direction:column;gap:5px;max-height:280px;overflow-y:auto;">
-        ${ev.notesHistory.map((h,i)=>`<div style="background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:8px 11px;">
+        ${ev.notesHistory.map((h,i)=>`<div style="background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:8px 11px;" id="ev-journal-entry-${ev.id}-${i}">
           <div style="display:flex;align-items:center;margin-bottom:4px;">
             <span style="font-size:10px;font-weight:700;font-family:'Syne',sans-serif;color:var(--ink2);">📅 ${h.date}</span>
-            <span style="cursor:pointer;color:var(--ink3);font-size:11px;margin-left:auto;" onclick="deleteEvNote(${ev.id},${i})">✕</span>
+            <div style="margin-left:auto;display:flex;gap:5px;">
+              <span style="cursor:pointer;color:var(--ink2);font-size:11px;" onclick="editEvJournalEntry(${ev.id},${i})">✏️</span>
+              <span style="cursor:pointer;color:var(--ink3);font-size:11px;" onclick="deleteEvNote(${ev.id},${i})">✕</span>
+            </div>
           </div>
-          <div style="font-size:12px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;">${esc(h.text)}</div>
+          <div style="font-size:12px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;" id="ev-journal-text-${ev.id}-${i}">${esc(h.text)}</div>
         </div>`).join('')}
       </div>`:''}
     </div>
