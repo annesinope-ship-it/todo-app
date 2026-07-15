@@ -574,6 +574,36 @@ delete state.flags;
   state.nextEvId=maxId+1;
 })();
 
+// Migrate old notesCats/notes content to notesHistory
+(function(){
+  let changed=false;
+  state.events.forEach(ev=>{
+    if(!ev.notesHistory)ev.notesHistory=[];
+    // Migrate notesCats.Global if not already in history
+    const cats=ev.notesCats||{};
+    ['Global','Informations importantes'].forEach(cat=>{
+      const val=(cats[cat]||'').trim();
+      if(val&&!ev.notesHistory.find(h=>h.text===val)){
+        ev.notesHistory.push({date:'Avant migration',text:val});
+        changed=true;
+      }
+    });
+    // Migrate ev.notes if not already in history
+    const oldNotes=(ev.notes||'').trim();
+    if(oldNotes&&!ev.notesHistory.find(h=>h.text===oldNotes)){
+      ev.notesHistory.push({date:'Avant migration',text:oldNotes});
+      changed=true;
+    }
+    // Sort history oldest last (keep most recent first)
+    ev.notesHistory.sort((a,b)=>{
+      if(a.date==='Avant migration')return 1;
+      if(b.date==='Avant migration')return -1;
+      return 0;
+    });
+  });
+  if(changed)save();
+})();
+
 // ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pcol(name){const ev=state.events.find(e=>e.name===name);if(ev&&ev.color)return ev.color;const i=state.projects.indexOf(name);return i>=0?PC[i%PC.length]:'#ccc';}
